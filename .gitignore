@@ -1,0 +1,24 @@
+node_modules/
+dist/
+build/
+.pnpm-store/
+.cache/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+tmp/
+
+# --- iOS 壳 ---
+# 前端产物由构建脚本同步进 ios/ChatDemo/web，不进仓库
+ios/ChatDemo/web/
+# XcodeGen 生成，不入库
+ios/ChatDemo.xcodeproj/
+ios/*.xcworkspace/
+ios/build/
+ios/out/
+ios/*.ipa
+ios/DerivedData/
+xcuserdata/
+*.xcuserstate

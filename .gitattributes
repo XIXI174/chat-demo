@@ -1,0 +1,8 @@
+# 统一用 LF。iOS 构建脚本要在 macOS 上跑，CRLF 会让
+# `bash scripts/make-ipa.sh` 报 bad interpreter: /usr/bin/env: 'bash\r'。
+* text=auto eol=lf
+
+*.png binary
+*.woff binary
+*.woff2 binary
+*.ttf binary

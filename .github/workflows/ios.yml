@@ -1,0 +1,190 @@
+name: Build iOS IPA
+
+# 在 macOS runner 上跑完整链路：前端构建 → 生成 Xcode 工程 → 编译 → 打 ipa。
+#
+# 默认产出**未签名** ipa（artifact 名字 ChatDemo-unsigned）。
+# 如果仓库配置了下面 4 个 secret，会额外产出一个已签名、可直接 AirDrop/OTA 安装的 ipa：
+#   APPLE_CERT_P12         签名证书 .p12 的 base64（Apple Development 或 Apple Distribution）
+#   APPLE_CERT_PASSWORD    .p12 的密码
+#   APPLE_PROFILE          Ad Hoc / Development provisioning profile 的 base64
+#   APPLE_TEAM_ID          10 位 Team ID
+#   APPLE_PROFILE_NAME     profile 在机器上的安装名（可与文件名不同，但必须和证书匹配）
+#
+# 拿不到签名身份也没关系：未签名 ipa 用 Sideloadly 以个人 Apple ID 重签即可安装，
+# 步骤见 IOS.md。
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - "scripts/**"
+      - "src/**"
+      - "rspack.config.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/ios.yml"
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      HAS_SIGNING: ${{ secrets.APPLE_CERT_P12 != '' && secrets.APPLE_PROFILE != '' && secrets.APPLE_TEAM_ID != '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.6.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Build web bundle
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          NODE_ENV=production pnpm exec rspack build -c rspack.config.ts
+          rm -rf ios/ChatDemo/web
+          mkdir -p ios/ChatDemo/web
+          cp -R dist/. ios/ChatDemo/web/
+          echo "web files: $(find ios/ChatDemo/web -type f | wc -l)"
+
+      - name: Setup XcodeGen
+        run: |
+          set -euo pipefail
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      # ---------- 已签名分支 ----------
+
+      - name: Import signing assets
+        if: env.HAS_SIGNING == 'true'
+        env:
+          CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          PROFILE_B64: ${{ secrets.APPLE_PROFILE }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+          echo -n "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+
+          echo -n "$PROFILE_B64" | base64 --decode > "$RUNNER_TEMP/profile.mobileprovision"
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp "$RUNNER_TEMP/profile.mobileprovision" ~/Library/MobileDevice/Provisioning\ Profiles/
+          security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" > "$RUNNER_TEMP/profile.plist"
+          /usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/profile.plist"
+
+      - name: Archive (signed)
+        if: env.HAS_SIGNING == 'true'
+        working-directory: ios
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PROFILE_NAME: ${{ secrets.APPLE_PROFILE_NAME }}
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project ChatDemo.xcodeproj \
+            -scheme ChatDemo \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/ChatDemo.xcarchive" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            -quiet
+
+      - name: Export signed ipa
+        if: env.HAS_SIGNING == 'true'
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PROFILE_NAME: ${{ secrets.APPLE_PROFILE_NAME }}
+        run: |
+          set -euo pipefail
+          /usr/libexec/PlistBuddy -c "Add :method string ad-hoc" \
+            -c "Add :teamID string $TEAM_ID" \
+            -c "Add :signingStyle string manual" \
+            -c "Add :signingCertificate string 'Apple Distribution'" \
+            -c "Add :compileBitcode bool false" \
+            -c "Add :stripSwiftSymbols bool true" \
+            -c "Add :destination string export" \
+            "$RUNNER_TEMP/ExportOptions.plist"
+          # provisioningProfiles 是嵌套字典，用 PlistBuddy 单独建。
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" \
+            -c "Add :provisioningProfiles:com.deepseek.chatdemo string $PROFILE_NAME" \
+            "$RUNNER_TEMP/ExportOptions.plist"
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/ChatDemo.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -quiet
+
+          mv "$RUNNER_TEMP/export/ChatDemo.ipa" "$RUNNER_TEMP/ChatDemo-signed.ipa"
+
+      # ---------- 未签名分支 ----------
+
+      - name: Archive (unsigned)
+        if: env.HAS_SIGNING != 'true'
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project ChatDemo.xcodeproj \
+            -scheme ChatDemo \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/ChatDemo.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            -quiet
+
+      - name: Package unsigned ipa
+        if: env.HAS_SIGNING != 'true'
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/ChatDemo.xcarchive/Products/Applications/ChatDemo.app"
+          test -d "$APP"
+          mkdir -p "$RUNNER_TEMP/Payload"
+          cp -R "$APP" "$RUNNER_TEMP/Payload/"
+          (cd "$RUNNER_TEMP" && zip -qry ChatDemo-unsigned.ipa Payload)
+          du -h "$RUNNER_TEMP/ChatDemo-unsigned.ipa"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.HAS_SIGNING == 'true' && 'ChatDemo-signed' || 'ChatDemo-unsigned' }}
+          path: ${{ env.HAS_SIGNING == 'true' && format('{0}/ChatDemo-signed.ipa', runner.temp) || format('{0}/ChatDemo-unsigned.ipa', runner.temp) }}
+          if-no-files-found: error
+          retention-days: 30

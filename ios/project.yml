@@ -1,0 +1,68 @@
+# XcodeGen 工程描述。
+#
+# 用脚本生成 .xcodeproj，避免把二进制工程文件提交进仓库，
+# 也避免在 Windows 上无法用 Xcode 打开工程改配置。
+#
+#   brew install xcodegen
+#   cd ios && xcodegen generate
+#
+name: ChatDemo
+
+options:
+  bundleIdPrefix: com.deepseek
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    SWIFT_EMIT_LOC_STRINGS: NO
+
+targets:
+  ChatDemo:
+    type: application
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources:
+      # 原生源码与资源。Info.plist 由 INFOPLIST_FILE 单独引用，不能进资源拷贝。
+      - path: ChatDemo
+        excludes:
+          - "Info.plist"
+          - "web"
+      # 前端构建产物整个目录原样拷进包内（app/web/...），保持相对路径不变。
+      - path: ChatDemo/web
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.deepseek.chatdemo
+        PRODUCT_NAME: ChatDemo
+        INFOPLIST_FILE: ChatDemo/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+        SWIFT_COMPILATION_MODE: singlefile
+      configs:
+        Release:
+          SWIFT_OPTIMIZATION_LEVEL: "-O"
+          SWIFT_COMPILATION_MODE: wholemodule
+          VALIDATE_PRODUCT: YES
+
+schemes:
+  ChatDemo:
+    build:
+      targets:
+        ChatDemo: all
+    run:
+      config: Debug
+    archive:
+      config: Release

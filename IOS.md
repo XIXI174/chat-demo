@@ -133,6 +133,8 @@ python scripts\generate-icon.py
 
 未签名 ipa 不能直接点开安装，必须用个人 Apple ID 重签：
 
+> **iPhone 不在身边（异地/远程客户）别走这条**：Sideloadly 要 USB 连电脑，7 天到期还得再插一次线。改用 [PWA.md](<PWA.md>) 的 HTTPS PWA 方案——发个网址，客户 Safari 打开点「添加到主屏幕」即可，无需签名、无需电脑、无需续签。
+
 1. Windows 装 [Sideloadly](https://sideloadly.io/)（需要 iTunes / Apple Devices 驱动）。
 2. 把 `ChatDemo-unsigned.ipa` 拖进去，填 Apple ID，点 Start。
 3. 手机上「设置 → 通用 → VPN与设备管理」信任开发者证书。

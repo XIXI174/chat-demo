@@ -33,6 +33,8 @@
 
 | 文件 | 说明 |
 |---|---|
+| `https://xixi174.github.io/chat-demo/` | **直接发给客户的链接**（Pages 根路径，已上线验证 200） |
+| `ChatDemo-PWA.zip` | 同上内容的离线 zip，公开下载：`https://github.com/XIXI174/chat-demo/releases/download/ios-v1.0.0/ChatDemo-PWA.zip`（1,957,358 字节，164 entries） |
 | `scripts/build-pwa-web.ps1` | Windows 本机构建（已验证：159 文件 / 4.24 MB） |
 | `scripts/build-pwa-web.sh` | Linux/macOS/CI 构建 |
 | `.github/workflows/pwa.yml` | CI：构建 → 出 `ChatDemo-PWA.zip` artifact → 发到 GitHub Pages（该环境的唯一部署方） |

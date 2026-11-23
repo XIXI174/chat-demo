@@ -67,6 +67,9 @@ scripts/
 3. 等 5~10 分钟，在跑完的那次 run 底部下载 artifact：
    - 没配签名 secret → `ChatDemo-unsigned`，里面 `ChatDemo-unsigned.ipa`
    - 配了 → `ChatDemo-signed`，可直接装
+   - `ChatDemo-simulator` → `ChatDemo-simulator.zip`，给 Appetize 这类在线模拟器用（见「没有 iPhone」一节）
+
+**注意**：`ChatDemo-unsigned.ipa` 是 device 构建（Mach-O `platform 2`），`ChatDemo-simulator.zip` 里的 `ChatDemo.app` 是 Simulator 构建（fat：x86_64 + arm64，`platform 7`）。两者二进制平台标记不同，不能互相改名顶替——ipa 传进模拟器起不来，simulator .app 也装不进真机。workflow 里用 `-destination 'generic/platform=iOS Simulator'` + `ARCHS="arm64 x86_64"` 单独编的。
 
 如果要出**能直接装**的 ipa，在仓库 Secrets 里配这 5 个：
 
@@ -144,6 +147,21 @@ python scripts\generate-icon.py
 
 ---
 
+### 没有 iPhone：在线模拟器（Appetize.io）
+
+真机之外还有一条验收路：把 **Simulator 构建**的 `.app` 打成 zip 传进 [Appetize.io](https://appetize.io/)。
+
+1. 下 `ChatDemo-simulator.zip`（Release `ios-v1.0.0` 里有，或自己跑 CI 拿 `ChatDemo-simulator` artifact）。
+2. 上传时 **不要解压**，zip 顶层就是 `ChatDemo.app/`（无 `__MACOSX`）。Appetize 只收 `.zip` / `.tar.gz`。
+3. 设备选 `iphone14pro`，系统 `17.2`，点 Start。
+
+能验收：界面、深色模式、Markdown/公式/Mermaid、填 API Key、流式对话、会话持久化。
+不能验收：语音输入（模拟器无麦克风，`getUserMedia` 拿不到设备）、TTS 声音（走宿主音频，时有时无）、真机性能。免费计划每月 30 分钟。
+
+ipa 里是 device 构建（arm64，`platform 2`），**传进模拟器跑不起来**，必须用 simulator 那份。
+
+---
+
 ## 首次启动要做的事
 
 1. 打开 App，进「设置」，填 DeepSeek API Key（`sk-` 开头，[platform.deepseek.com](https://platform.deepseek.com) 申请）。
@@ -159,7 +177,7 @@ python scripts\generate-icon.py
 - **没有推送**。WebView 里没有 APNs，App 不在前台就不会有通知。
 - **没有后台常驻**。切后台后请求可能被挂起，长回答建议留在前台。
 - **TTS 朗读**需要点击后触发（Web Audio 的用户手势要求），这和 Safari 里一样。
-- **文件导入**走 `UIDocumentPickerViewController`，只能选「文件」App 里能看到的文件。
+- **文件导入**走 WebKit 默认文件选择器（iOS 会弹「照片图库 / 选取文件」），只能选「文件」App 里能看到的文件。
 - **分享/保存**走系统分享面板，想存到「照片」需要在面板里选对应动作。
 - 未签名包 7 天到期是 Apple 的免费 ID 规则。
 

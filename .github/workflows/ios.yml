@@ -216,3 +216,39 @@ jobs:
           path: ${{ env.HAS_SIGNING == 'true' && format('{0}/ChatDemo-signed.ipa', runner.temp) || format('{0}/ChatDemo-unsigned.ipa', runner.temp) }}
           if-no-files-found: error
           retention-days: 30
+
+      # Appetize.io 这类在线 iOS 模拟器只接受 Simulator 构建的 .app，
+      # device (arm64) 二进制在模拟器里跑不起来，所以单独再编一份。
+      - name: Build simulator app
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project ChatDemo.xcodeproj \
+            -scheme ChatDemo \
+            -configuration Release \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/sim" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            ARCHS="arm64 x86_64" \
+            ONLY_ACTIVE_ARCH=NO
+
+      - name: Package simulator app
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/sim/Build/Products/Release-iphonesimulator/ChatDemo.app"
+          test -d "$APP"
+          cp -R "$APP" "$RUNNER_TEMP/ChatDemo.app"
+          (cd "$RUNNER_TEMP" && zip -qryX ChatDemo-simulator.zip ChatDemo.app)
+          du -h "$RUNNER_TEMP/ChatDemo-simulator.zip"
+          unzip -l "$RUNNER_TEMP/ChatDemo-simulator.zip" | head -8
+
+      - name: Upload simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChatDemo-simulator
+          path: ${{ runner.temp }}/ChatDemo-simulator.zip
+          if-no-files-found: error
+          retention-days: 30

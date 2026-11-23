@@ -127,6 +127,30 @@ python scripts\generate-icon.py
 
 ---
 
+## 首选：现成的原生客户端（不用你自己签名）
+
+> **iPhone 在异地、又想装「真原生程序」时，先看这一节。** 下面两个都是已经做好的
+> iOS 原生 App（DSH Harness 引擎客户端），客户自己在 App Store 点一下就装好，
+> 零电脑、零签名、零 7 天续签——正好绕开了人机分离和安装签名这两个坑。
+> 注意：它们是 **DSH Harness 引擎**，不是本仓库的 chat-demo 前端；客户只要 chat-demo
+> 那个界面，才用后面「装到 iPhone」里的 ipa / PWA。
+
+| | **Fish Pocket**（推荐给异地客户） | **dsh-Go**（你偏好的牌子） |
+|---|---|---|
+| 装法 | App Store 国区直接下：[apps.apple.com/cn/app/fish-pocket/id6830703602](https://apps.apple.com/cn/app/fish-pocket/id6830703602) 或 [TestFlight](https://testflight.apple.com/join/2SCftb2M) | GitHub Release 的 `dsh-go-1.3.0-ios-unsigned.ipa` 是**未签名**包，远程装要走 [OTA.md](<OTA.md>) 付费签名 / TrollStore / 客户自装 Sideloadly |
+| 要不要电脑 | **不要** | 要（自签/重签），异地不方便 |
+| 要不要续签 | **不要** | 免费 ID 7 天，付费/企业签才免 |
+| 系统要求 | iOS 17+ | iOS 15+ |
+| 原生程度 | 纯 SwiftUI，引擎（Node 24 / Python 3.15 / libgit2 / FFmpeg）跑在 App 内线程，**不是网页套壳** | Flutter 界面 + 原生引擎 addon framework |
+| 成熟度 | 已上架、4.9 分 / 88 评分、内置几十家模型 provider、可导 DeepSeek 聊天记录 | 30k stars、功能体量大（桌宠/酒馆/多端），但 README 明说「iOS 版仍在开发和真机测试，没有公开安装包」，ipa 只是 CI 编译产物 |
+| 关系 | 作者自述「DSH Go 启发我们做了这个 iOS 版本」→ 二者同源 | 被借鉴的一方 |
+
+**结论**：喜欢 dsh-go 与用 Fish Pocket 不冲突，它就是 dsh-Go 的 iOS 姊妹作。
+要「发个链接客户就装好」选 Fish Pocket；要「牌子必须是 dsh-Go、且愿意办开发者账号」
+按 [OTA.md](<OTA.md>) 走付费签名 + 点链接安装。
+
+---
+
 ## 装到 iPhone
 
 ### 未签名 ipa
@@ -146,6 +170,10 @@ python scripts\generate-icon.py
 
 - Ad Hoc：用 Apple Configurator / Xcode Devices 装，或者托管的 OTA 分发页。
 - 企业签名 / TestFlight：走正常分发流程。
+- **远程点链接安装（人机分离）**：完整落地步骤见 [OTA.md](<OTA.md>)——
+  `scripts/resign-ipa.sh` 先签嵌套 framework 再签主 App，`scripts/make-ota.py`
+  从 ipa 读 bundle-id 生成 `manifest.plist` + `itms-services://` 落地页，
+  传 HTTPS 托管后把链接发给客户即可。同样适用于重签 dsh-Go 的 unsigned ipa。
 
 ---
 

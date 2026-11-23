@@ -1,5 +1,22 @@
 # 远程 iPhone 安装方案：PWA（推荐）
 
+> **先说清楚 PWA 是什么，免得踩坑**：PWA 和直接访问 `https://cdn.deepseek.com/chat-demo`
+> 是**同一份前端**——两边 `static/js/main.4fc5bb07.js` 都是 477,569 字节、
+> SHA256 都是 `C4C9FB2A55C452BB4B31780DF5C2D565C2583312B39A2876EA171755ED112855`，
+> 逐字节相同。PWA 只是多加了 manifest（standalone 全屏）、Service Worker（离线壳）
+> 和主屏图标，**本质仍是网页，不是原生程序**。
+>
+> 想要「真原生 App」，看这两条：
+> - **省事**：用现成的原生客户端 [Fish Pocket / dsh-Go 对比与首选节](<IOS.md>)，
+>   客户 App Store 点一下装好，零签名零续签。
+> - **要自己那个 ipa / 要 dsh-Go 牌子**：`ChatDemo-unsigned.ipa` 里
+>   `Payload/ChatDemo.app/ChatDemo` 本来就是编译好的 ARM64 Mach-O 原生可执行程序
+>   （`magic 0xfeedfacf`、`platform 2` 真机 iOS 15.0+）。它装不上异地手机的唯一关卡
+>   是 **Apple 签名规则**，不是技术做不到。远程点链接安装走 [OTA.md](<OTA.md>)：
+>   付费签名 → 重签 → `itms-services://` 落地页。
+>
+> PWA 的价值在于「零门槛、零成本、发个网址就能用」；要原生体验就别指望 PWA。
+
 ## 为什么不用 ipa
 
 `ChatDemo-unsigned.ipa` 是**未签名**包，安装前提是 Sideloadly + 数据线把 iPhone 连到电脑，用客户的 Apple ID 重签（免费 ID 7 天过期，还要在手机上点「信任开发者」）。
@@ -7,7 +24,7 @@
 现在手机在北京、你在河南，人机分离——USB 连不上、7 天到期也没法插线续签。硬走这条路只有两个变体，都不省事：
 
 1. **客户自己装 Sideloadly + iTunes**，自己用他的 Apple ID 重签。等于把整套流程远程教给客户，还要他给你他的 Apple ID/专用密码，或者他自己操作。
-2. **换成付费签名**（$99/年开发者账号 → Ad Hoc / TestFlight / 企业签），出一个客户点链接就能装的 ipa。要钱、要审核、要收集客户 UDID，且企业签有被吊销风险。
+2. **换成付费签名**（$99/年开发者账号 → Ad Hoc / TestFlight / 企业签），出一个客户点链接就能装的 ipa。要钱、要审核、要收集客户 UDID，且企业签有被吊销风险。这条路的完整落地脚本见 [OTA.md](<OTA.md>)（`resign-ipa.sh` + `make-ota.py`），它才是「远程装真原生 App」的正解，本文 PWA 只是不想办账号时的替代。
 
 **最省事的是绕开 ipa**：这个 App 本质是一套静态前端（React + Rspack），功能全在网页里，原生壳只提供了本地 HTTP origin 和下载/预览桥接。把它托管到一个 HTTPS 网址，客户用 Safari 打开、点「添加到主屏幕」，得到一个全屏、有图标、能离线打开壳资源的 App——**不用签名、不用电脑、不用 App Store、不用 7 天续签、跨国照样能用**。
 

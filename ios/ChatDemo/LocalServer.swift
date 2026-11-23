@@ -111,8 +111,8 @@ final class LocalServer {
         }
 
         let listener = try NWListener(using: parameters)
-        // acceptLocalOnly 是 NWListener 的属性，不是 NWParameters 的。
-        listener.acceptLocalOnly = loopbackOnly
+        // 只监听回环地址：requiredLocalEndpoint 指定 127.0.0.1 时，
+        // Network.framework 只会绑本机回环，外部设备连不上。
         self.listener = listener
 
         let ready = DispatchSemaphore(value: 0)

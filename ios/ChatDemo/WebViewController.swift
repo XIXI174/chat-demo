@@ -19,7 +19,6 @@ final class WebViewController: UIViewController {
     private var server: LocalServer?
     private var webView: WKWebView!
     private var loadErrorView: UIView?
-    private var pendingOpenPanel: (([URL]?) -> Void)?
     private var previewFileURL: URL?
     private let filesDirectory = FileManager.default.temporaryDirectory
         .appendingPathComponent("chat-demo-files", isDirectory: true)
@@ -316,39 +315,9 @@ extension WebViewController: WKUIDelegate {
         decisionHandler(.grant)
     }
 
-    /// 页面里的 <input type=file>（导入会话、上传附件）转成系统文件选择器。
-    func webView(
-        _ webView: WKWebView,
-        runOpenPanelWith parameters: WKOpenPanelParameters,
-        initiatedByFrame frame: WKFrameInfo,
-        completionHandler: @escaping ([URL]?) -> Void
-    ) {
-        pendingOpenPanel = completionHandler
-        let picker = UIDocumentPickerViewController(
-            forOpeningContentTypes: [.item],
-            asCopy: true
-        )
-        picker.allowsMultipleSelection = parameters.allowsMultipleSelection
-        picker.delegate = self
-        present(picker, animated: true)
-    }
-}
-
-// MARK: - UIDocumentPickerDelegate
-
-extension WebViewController: UIDocumentPickerDelegate {
-    func documentPicker(
-        _ controller: UIDocumentPickerViewController,
-        didPickDocumentsAt urls: [URL]
-    ) {
-        pendingOpenPanel?(urls)
-        pendingOpenPanel = nil
-    }
-
-    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-        pendingOpenPanel?(nil)
-        pendingOpenPanel = nil
-    }
+    // 页面里的 <input type=file> 交给 WebKit 默认处理（照片图库 / 选取文件）。
+    // 不实现 runOpenPanelWith：WKOpenPanelParameters 在 SDK 里标成了 iOS 18.4+，
+    // 实现它会把最低版本顶到 18.4，而默认行为在 iOS 15 上已经够用。
 }
 
 // MARK: - QLPreviewControllerDataSource

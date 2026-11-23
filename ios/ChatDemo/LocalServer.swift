@@ -105,12 +105,13 @@ final class LocalServer {
     private func listen(loopbackOnly: Bool) throws -> UInt16 {
         let parameters = NWParameters.tcp
         parameters.allowLocalEndpointReuse = true
-        parameters.acceptLocalOnly = loopbackOnly
         if loopbackOnly {
             parameters.requiredLocalEndpoint = NWEndpoint.hostPort(host: "127.0.0.1", port: .any)
         }
 
         let listener = try NWListener(using: parameters)
+        // acceptLocalOnly 是 NWListener 的属性，不是 NWParameters 的。
+        listener.acceptLocalOnly = loopbackOnly
         self.listener = listener
 
         let ready = DispatchSemaphore(value: 0)

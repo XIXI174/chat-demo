@@ -1,0 +1,101 @@
+name: Deploy PWA (remote iPhone install)
+
+# 远程 iPhone 装不了：Sideloadly 要 USB 连电脑、手机和客户不在一起。
+# 这条流水线把 chat-demo 构建成可「添加到主屏幕」的 PWA，
+# 客户用 Safari 打开网址即可全屏使用，不用签名、不用电脑、不用 App Store、不用 7 天续签。
+#
+# 本 workflow 是 github-pages 环境的唯一部署方（旧的 Deploy GitHub Pages 已降级为纯检查，
+# 避免两个 workflow 抢同一个 Pages 站点）。PWA 直接放在站点根路径：
+#   https://<owner>.github.io/<repo>/
+#
+# 另出 artifact `ChatDemo-PWA.zip`，可下载后传到任意 HTTPS 静态托管。
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "public/**"
+      - "rspack.config.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/build-pwa-web.sh"
+      - ".github/workflows/pwa.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.6.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Build PWA
+        run: bash scripts/build-pwa-web.sh
+
+      - name: Package zip
+        run: |
+          set -euo pipefail
+          (cd pwa && zip -qryX ../ChatDemo-PWA.zip .)
+          du -h ChatDemo-PWA.zip
+          unzip -l ChatDemo-PWA.zip | head -12
+
+      - name: Upload PWA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChatDemo-PWA
+          path: ChatDemo-PWA.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Assemble Pages site
+        run: |
+          set -euo pipefail
+          rm -rf _site
+          mkdir -p _site
+          cp -R pwa/. _site/
+          test -f _site/index.html
+          test -f _site/manifest.webmanifest
+          test -f _site/sw.js
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

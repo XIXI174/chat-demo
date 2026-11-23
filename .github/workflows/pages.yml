@@ -1,4 +1,10 @@
-name: Deploy GitHub Pages
+name: Check Web (type + lint)
+
+# 纯检查，不再部署 Pages。
+# 历史：这个 workflow 原来负责部署 GitHub Pages，但后来新增了 Deploy PWA，
+# 两个 workflow 抢同一个 github-pages 环境会互相覆盖根站点。
+# 现在 Pages 统一由 .github/workflows/pwa.yml 部署（PWA 放根路径），
+# 这里只保留类型检查 + lint + 一次前端构建作为质量门禁。
 
 on:
   push:
@@ -9,16 +15,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: github-pages
-  cancel-in-progress: false
+  group: check-web-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    permissions:
-      contents: read
-      pages: read
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -43,28 +46,5 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-
-      - name: Build
-        run: pnpm build
-
-      - name: Upload site
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      - name: Build web bundle
+        run: NODE_ENV=production pnpm exec rspack build -c rspack.config.ts

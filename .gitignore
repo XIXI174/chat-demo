@@ -22,3 +22,8 @@ ios/*.ipa
 ios/DerivedData/
 xcuserdata/
 *.xcuserstate
+
+# --- PWA（由 scripts/build-pwa-web.* 生成，不入库）---
+/pwa/
+/_site/
+/ChatDemo-PWA.zip

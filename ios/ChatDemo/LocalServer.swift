@@ -35,8 +35,9 @@ struct LocalHTTPRequest {
         var length = 0
         for line in lines.dropFirst() {
             guard !line.isEmpty, let colon = line.firstIndex(of: ":") else { continue }
-            let name = line[line.startIndex..<colon].lowercased()
-            let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            let name = String(line[line.startIndex..<colon]).lowercased()
+            let value = String(line[line.index(after: colon)...])
+                .trimmingCharacters(in: .whitespaces)
             switch name {
             case "connection":
                 explicitClose = value.lowercased().contains("close")
